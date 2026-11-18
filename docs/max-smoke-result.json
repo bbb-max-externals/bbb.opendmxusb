@@ -1,0 +1,85 @@
+[
+  {
+    "name": "loaded",
+    "actual": "bbb.opendmxusb.check",
+    "expected": "bbb.opendmxusb.check",
+    "passed": true
+  },
+  {
+    "name": "mode",
+    "actual": 1,
+    "expected": 1,
+    "passed": true
+  },
+  {
+    "name": "num_channels",
+    "actual": 4,
+    "expected": 4,
+    "passed": true
+  },
+  {
+    "name": "port",
+    "actual": "none",
+    "expected": "none",
+    "passed": true
+  },
+  {
+    "event": "ports",
+    "args": [
+      "/dev/cu.ambieAM-TW01",
+      "/dev/cu.Bluetooth-Incoming-Port",
+      "/dev/cu.debug-console",
+      "/dev/cu.NothingHeadphone1",
+      "/dev/cu.OpenCommbyAfterShokz",
+      "/dev/cu.usbserial-BG04ENH8"
+    ]
+  },
+  {
+    "name": "dump",
+    "actual": [
+      255,
+      33,
+      44,
+      55
+    ],
+    "expected": [
+      255,
+      33,
+      44,
+      55
+    ],
+    "passed": true
+  },
+  {
+    "name": "origin",
+    "actual": 0,
+    "expected": 0,
+    "passed": true
+  },
+  {
+    "name": "blackout",
+    "actual": 1,
+    "expected": 1,
+    "passed": true
+  },
+  {
+    "event": "status",
+    "args": [
+      0,
+      "none"
+    ]
+  },
+  {
+    "event": "error",
+    "args": [
+      "/dev/cu.bbb-opendmxusb-missing-test-port: open: No such file or directory"
+    ]
+  },
+  {
+    "event": "status",
+    "args": [
+      0,
+      "/dev/cu.bbb-opendmxusb-missing-test-port"
+    ]
+  }
+]

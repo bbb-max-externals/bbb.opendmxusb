@@ -1,0 +1,5 @@
+patch "DMX API Check"
+start = loadbang at(30, 30)
+run = message "run" at(30, 65)
+smoke = js max-smoke.js at(400, 150)
+start -> run -> smoke

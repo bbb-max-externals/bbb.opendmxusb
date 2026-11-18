@@ -1,0 +1,7 @@
+{
+  "name": "bbb.opendmxusb", "displayname": "bbb.opendmxusb", "version": "0.1.0",
+  "author": "2bit", "description": "ENTTEC OPEN DMX USB output via a macOS serial port",
+  "tags": ["DMX", "lighting", "serial"], "max_version_min": "8.0",
+  "os": {"macintosh": {"min_version": "11.0", "platform": ["aarch64", "x64"]}},
+  "homepatcher": "bbb.opendmxusb.maxhelp"
+}

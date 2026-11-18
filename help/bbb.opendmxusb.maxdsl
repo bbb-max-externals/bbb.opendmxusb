@@ -1,0 +1,46 @@
+patch "Serial DMX Output"
+intro = comment "Select a serial port, then send DMX levels. Disconnect with close or port none." at(30, 20, 760, 22)
+ports = message "ports" at(30, 65)
+refresh = message "refresh" at(95, 65)
+port = attrui @attr port at(180, 65, 480, 22)
+open = message "open" at(680, 65)
+close = message "close" at(740, 65)
+mode = attrui @attr mode at(30, 120, 240, 22)
+rate = attrui @attr framerate at(290, 120, 200, 22)
+channels = attrui @attr num_channels at(510, 120, 200, 22)
+blackout = attrui @attr blackout at(30, 165, 240, 22)
+origin = attrui @attr origin at(290, 165, 200, 22)
+mode_note = comment "Default: forced (40 fps). Other modes send only on messages; fixtures may time out." at(30, 205, 760, 22)
+levels = message "255 128 0 0" at(30, 250)
+channel = message "channel 1 255" at(180, 250)
+store = message "set 0 128 255 0" at(330, 250)
+store_channel = message "setchannel 1 0" at(500, 250)
+offset = message "set_offset 2 255 128 0" at(650, 250)
+bang = button at(30, 300)
+dump = message "dump" at(95, 300)
+status = message "status" at(180, 300)
+store_note = comment "set / setchannel / set_offset store values. In forced mode the next refresh uses them." at(30, 345, 760, 22)
+controller = bbb.opendmxusb at(30, 410, 180, 22)
+frame_or_dump = print opendmx.data at(30, 470)
+port_status = print opendmx.status at(350, 470)
+limits = comment "OPEN DMX USB (FTDI virtual serial port), macOS. USB PRO and RDM are not supported." at(30, 525, 780, 22)
+ports -> controller
+refresh -> controller
+port -> controller
+open -> controller
+close -> controller
+mode -> controller
+rate -> controller
+channels -> controller
+blackout -> controller
+origin -> controller
+levels -> controller
+channel -> controller
+store -> controller
+store_channel -> controller
+offset -> controller
+bang -> controller
+dump -> controller
+status -> controller
+controller -> frame_or_dump
+controller[1] -> port_status

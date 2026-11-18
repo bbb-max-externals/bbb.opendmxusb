@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "bbb_opendmxusb",
+    "name": "bbb.opendmxusb"
+  },
+  "objects": [
+    {
+      "name": "bbb.opendmxusb",
+      "kind": "external",
+      "path": "externals/bbb.opendmxusb.mxo",
+      "ports": {
+        "mode": "fixed",
+        "inlets": 1,
+        "outlets": [
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "attrui",
+      "kind": "external",
+      "serialization": {
+        "maxclass": "attrui"
+      },
+      "ports": {
+        "mode": "fixed",
+        "inlets": 1,
+        "outlets": [
+          ""
+        ]
+      }
+    }
+  ]
+}

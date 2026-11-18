@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<c74object name="bbb.opendmxusb" category="Lighting">
+<digest>Send DMX through an ENTTEC OPEN DMX USB serial port</digest>
+<description>macOS FTDI virtual serial port output. One 512-channel buffer, no universe or IP settings. Choose a port using attrui; ports or refresh updates the choices.</description>
+<inletlist><inlet id="0" type="list"><digest>DMX values, messages and attributes</digest></inlet></inletlist>
+<outletlist>
+<outlet id="0" type="bang/list"><digest>Serial-frame completion bang or dump list</digest></outlet>
+<outlet id="1" type="anything"><digest>ports, opened, closed, error, status, coalesced</digest></outlet>
+</outletlist>
+<methodlist>
+<method name="list"><digest>Update levels from the first channel; request output according to mode</digest></method>
+<method name="channel"><digest>Set channel and value; request output according to mode</digest></method>
+<method name="set"><digest>Store levels without a send request</digest></method>
+<method name="setchannel"><digest>Store one channel and value without a send request</digest></method>
+<method name="set_offset"><digest>Store values beginning at a channel without a send request</digest></method>
+<method name="bang"><digest>Request the current frame in any mode</digest></method>
+<method name="dump"><digest>Output stored levels before blackout masking</digest></method>
+<method name="ports"><digest>List serial ports and refresh the port attribute choices</digest></method>
+<method name="refresh"><digest>Alias for ports</digest></method>
+<method name="open"><digest>Reconnect selected port, or select and connect the supplied path</digest></method>
+<method name="close"><digest>Disconnect while retaining the port selection and levels</digest></method>
+<method name="status"><digest>Output connection flag and selected port</digest></method>
+</methodlist>
+<attributelist>
+<attribute name="port" type="symbol" default="none"><digest>Callout serial device path; none disconnects</digest></attribute>
+<attribute name="num_channels" type="int" default="512"><digest>Transmitted channel count, 1 to 512</digest></attribute>
+<attribute name="origin" type="int" default="1"><digest>Channel numbering origin, 0 or 1</digest></attribute>
+<attribute name="blackout" type="int" default="0"><digest>Mask outgoing levels with zero without erasing stored values</digest></attribute>
+<attribute name="mode" type="int" default="4"><digest>0 automatic, 1 bang, 2 update, 3 change, 4 forced</digest></attribute>
+<attribute name="framerate" type="float" default="40"><digest>Maximum refresh rate, 0.01 to 44 fps</digest></attribute>
+<attribute name="verbose" type="int" default="0"><digest>Print connection events in Max Console</digest></attribute>
+</attributelist>
+</c74object>
