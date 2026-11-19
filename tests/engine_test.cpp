@@ -31,26 +31,47 @@ template<class F> static void until(F f) {
 int main() try {
     {
         opendmx::Engine<FakeSerial> e([]{});
+        auto update = [&](size_t offset, std::initializer_list<uint8_t> data, bool trigger) {
+            e.update(offset, data.begin(), data.size(), trigger);
+        };
         e.configure(1, 512, false, 44);
-        e.update(0, {10, 20, 30}, false);
-        e.update(511, {255, 128}, false); // must never overflow start code / frame
+        update(0, {10, 20, 30}, false);
+        update(511, {255, 128}, false); // must never overflow start code / frame
         e.connect("fake"); until([&] { return e.connected(); });
         check(FakeSerial::count() == 0, "bang mode transmitted without a bang");
         e.bang(); until([&] { return FakeSerial::count() == 1; });
         auto f = FakeSerial::last();
         check(f.size() == 513 && f[0] == 0 && f[1] == 10 && f[512] == 255, "DMX slot numbering/length corrupted");
-        e.configure(1, 3, true, 44); e.bang();
+        e.configure(1, 3, true, 44);
+        std::this_thread::sleep_for(35ms);
+        check(FakeSerial::count() == 1, "bang mode sent on blackout change");
+        e.bang();
         until([&] { return FakeSerial::count() == 2; });
         check(FakeSerial::last() == std::vector<uint8_t>({0, 0, 0, 0}), "blackout must mask wire output");
         check(e.dump() == std::vector<uint8_t>({10, 20, 30}), "blackout destroyed stored levels");
-        e.configure(3, 3, false, 44); e.update(0, {11}, true);
-        until([&] { return FakeSerial::count() == 3; });
-        e.update(0, {11}, true);
+        for (int mode : {0, 2, 3}) {
+            const auto before = FakeSerial::count();
+            e.configure(mode, 3, false, 44);
+            until([&] { return FakeSerial::count() == before + 1; });
+            check(FakeSerial::last() == std::vector<uint8_t>({0, 10, 20, 30}), "blackout release did not restore levels");
+            e.configure(mode, 3, true, 44);
+            until([&] { return FakeSerial::count() == before + 2; });
+            check(FakeSerial::last() == std::vector<uint8_t>({0, 0, 0, 0}), "blackout change did not send zeros");
+            e.configure(mode, 3, true, 44);
+            std::this_thread::sleep_for(35ms);
+            check(FakeSerial::count() == before + 2, "unchanged blackout resent a frame");
+        }
+        e.configure(3, 3, false, 44);
+        until([&] { return FakeSerial::last() == std::vector<uint8_t>({0, 10, 20, 30}); });
+        const auto baseline = FakeSerial::count();
+        update(0, {11}, true);
+        until([&] { return FakeSerial::count() == baseline + 1; });
+        update(0, {11}, true);
         std::this_thread::sleep_for(35ms);
-        check(FakeSerial::count() == 3, "change mode resent identical output");
+        check(FakeSerial::count() == baseline + 1, "change mode resent identical output");
         e.configure(4, 3, false, 0.01);
         e.configure(4, 3, false, 40);
-        until([&] { return FakeSerial::count() >= 5; });
+        until([&] { return FakeSerial::count() >= baseline + 3; });
         check(FakeSerial::last() == std::vector<uint8_t>({0, 11, 20, 30}), "forced output did not restore data");
         FakeSerial::fail = true;
         until([&] { return !e.connected(); });
@@ -62,7 +83,7 @@ int main() try {
         e.connect("fake"); until([&] { return e.connected(); });
         e.connect(""); until([&] { return !e.connected() && FakeSerial::handles == 0; });
         const auto n = FakeSerial::count();
-        e.bang(); e.update(0, {99}, true); std::this_thread::sleep_for(35ms);
+        e.bang(); update(0, {99}, true); std::this_thread::sleep_for(35ms);
         check(FakeSerial::count() == n, "closed port still transmitted");
     }
     check(FakeSerial::handles == 0, "worker leaked a serial port");

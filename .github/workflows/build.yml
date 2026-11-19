@@ -1,0 +1,25 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Configure universal build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DOPEN_DMX_BUILD_TESTS=ON
+      - name: Build and check architectures
+        run: |
+          cmake --build build --parallel
+          lipo externals/bbb.opendmxusb.mxo/Contents/MacOS/bbb.opendmxusb -verify_arch arm64 x86_64
+      - name: Test frame and transport behavior
+        run: ctest --test-dir build --output-on-failure --no-tests=error

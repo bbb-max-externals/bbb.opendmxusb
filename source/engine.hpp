@@ -35,17 +35,21 @@ public:
         desired_ = std::move(path); ++generation_; pending_.reset(); previous_.reset();
         cv_.notify_one();
     }
-    void configure(int mode, int channels, bool blackout, double rate) {
+    void configure(int mode, int channels, bool blackout, double rate, int origin = 1) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (mode_ != mode) pending_.reset();
+        const bool blackout_changed = blackout_ != blackout;
+        origin_ = origin;
         mode_ = mode; channels_ = channels; blackout_ = blackout; rate_ = rate;
+        if (blackout_changed && connected_ && event_mode()) request(frame());
         cv_.notify_one();
     }
-    void update(size_t offset, const std::vector<uint8_t>& values, bool trigger) {
+    int origin() { std::lock_guard<std::mutex> lock(mutex_); return origin_; }
+    void update(size_t offset, const uint8_t* values, size_t count, bool trigger) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (offset >= 512) return;
-        std::copy_n(values.begin(), std::min(values.size(), 512 - offset), data_.begin() + offset);
-        if (trigger && (mode_ == 0 || mode_ == 2 || mode_ == 3)) {
+        std::copy_n(values, std::min(count, 512 - offset), data_.begin() + offset);
+        if (trigger && event_mode()) {
             auto f = frame();
             if (mode_ != 3 || !previous_ || !(f == *previous_)) request(f);
         }
@@ -61,6 +65,7 @@ public:
         Report r; std::swap(r, report_); return r;
     }
 private:
+    bool event_mode() const { return mode_ == 0 || mode_ == 2 || mode_ == 3; }
     Frame frame() const {
         Frame f; f.size = static_cast<size_t>(channels_) + 1;
         if (!blackout_) std::copy_n(data_.begin(), channels_, f.bytes.begin() + 1);
@@ -133,7 +138,7 @@ private:
     std::mutex mutex_;
     std::condition_variable cv_;
     std::array<uint8_t, 512> data_{};
-    int mode_ = 4, channels_ = 512;
+    int mode_ = 4, channels_ = 512, origin_ = 1;
     bool blackout_ = false, stop_ = false, connected_ = false;
     double rate_ = 40;
     std::string desired_;

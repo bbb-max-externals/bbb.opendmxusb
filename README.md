@@ -20,7 +20,7 @@ The FTDI interface must appear in macOS as a virtual serial port. A D2XX-only se
 
 | Message | Action |
 | --- | --- |
-| `list V...` or a numeric list | Update values starting at the first channel. The current mode determines whether to request a frame. |
+| `list V...`, a numeric list or a single number | Update values starting at the first channel. The current mode determines whether to request a frame. |
 | `channel CH VALUE` | Update one channel. The current mode determines whether to request a frame. |
 | `set V...` | Store values starting at the first channel without requesting a frame. |
 | `setchannel CH VALUE` | Store one channel value without requesting a frame. |
@@ -42,7 +42,7 @@ Channel values are clipped to 0–255 and fractional values are truncated. Nonnu
 | `port` | `none` | Serial port path, selectable with `attrui`. |
 | `num_channels` | `512` | Number of channels to transmit, from 1 to 512. |
 | `origin` | `1` | Channel numbering for `channel`, `setchannel` and `set_offset`. Set to 0 for zero-based numbering or 1 for one-based numbering. |
-| `blackout` | `0` | Set to 1 to send zeros in newly generated frames while preserving stored levels. |
+| `blackout` | `0` | Set to 1 to mask stored levels with zeros. While connected, changing blackout requests a frame in modes 0, 2 and 3. Clearing it restores the stored levels. Mode 1 waits for a bang and mode 4 uses the next refresh. |
 | `mode` | `4` | Transmission mode, as listed below. |
 | `framerate` | `40.` | Maximum frame rate, from 0.01 to 44 fps. |
 | `verbose` | `0` | Set to 1 to print connection events to the Max Console. |
@@ -65,15 +65,15 @@ The left outlet sends a bang when the serial send routine finishes and a list in
 
 ## Build
 
-The build requires CMake, Xcode Command Line Tools and a local checkout of Cycling '74's `max-sdk-base`. It uses the local SDK and system serial APIs without downloading dependencies.
+The build requires CMake, Xcode Command Line Tools and the pinned Cycling '74 `max-sdk-base` submodule.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-  -DMAX_SDK_BASE=/path/to/max-sdk-base
+git submodule update --init
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j 4
 ```
 
-In this workspace, CMake defaults to the SDK in the neighboring `bbb.utils/deps/min-api/max-sdk-base` directory. The build produces `externals/bbb.opendmxusb.mxo` and applies an ad hoc signature for local use.
+To use a different SDK checkout, pass `-DMAX_SDK_BASE=/path/to/max-sdk-base` at configure time. The build produces `externals/bbb.opendmxusb.mxo` and applies an ad hoc signature for local use.
 
 ## Verification and logs
 

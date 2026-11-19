@@ -21,7 +21,7 @@ struct OpenDMX {
 static t_class* klass;
 static os_log_t logger;
 static void configure(OpenDMX* x) {
-    if (x->engine) x->engine->configure(static_cast<int>(x->mode), static_cast<int>(x->num_channels), x->blackout != 0, x->framerate);
+    if (x->engine) x->engine->configure(static_cast<int>(x->mode), static_cast<int>(x->num_channels), x->blackout != 0, x->framerate, static_cast<int>(x->origin));
 }
 static void status_symbol(OpenDMX* x, const char* name, const std::string& text) {
     t_atom a; atom_setsym(&a, gensym(text.c_str()));
@@ -54,7 +54,7 @@ static void refresh_ports(OpenDMX* x, bool output) {
     if (output) outlet_anything(x->status, gensym("ports"), static_cast<short>(ports.size()), choices.data() + 1);
 }
 static void ports_low(OpenDMX* x, t_symbol*, long, t_atom*) { refresh_ports(x, true); }
-static void ports(OpenDMX* x) { defer(x, reinterpret_cast<method>(ports_low), nullptr, 0, nullptr); }
+static void ports(OpenDMX* x) { defer_low(x, reinterpret_cast<method>(ports_low), nullptr, 0, nullptr); }
 static void set_attribute_low(OpenDMX* x, t_symbol* name, long ac, t_atom* av) {
     object_attr_setvalueof(x, name, ac, av);
 }
@@ -67,7 +67,7 @@ static t_max_err set_port(OpenDMX* x, void*, long ac, t_atom* av) {
         return MAX_ERR_GENERIC;
     }
     if (!systhread_ismainthread()) {
-        defer(x, reinterpret_cast<method>(set_attribute_low), gensym("port"), ac, av);
+        defer_low(x, reinterpret_cast<method>(set_attribute_low), gensym("port"), ac, av);
         return MAX_ERR_NONE;
     }
     x->port = port;
@@ -80,7 +80,7 @@ static t_max_err set_number(OpenDMX* x, void* attr, long ac, t_atom* av) {
     if (!std::isfinite(v)) return MAX_ERR_GENERIC;
     const auto name = static_cast<t_symbol*>(object_method(attr, gensym("getname")));
     if (!systhread_ismainthread()) {
-        defer(x, reinterpret_cast<method>(set_attribute_low), name, ac, av);
+        defer_low(x, reinterpret_cast<method>(set_attribute_low), name, ac, av);
         return MAX_ERR_NONE;
     }
     if (name == gensym("mode")) x->mode = static_cast<long>(std::clamp(v, 0.0, 4.0));
@@ -99,15 +99,15 @@ static void open_low(OpenDMX* x, t_symbol*, long ac, t_atom* av) {
     }
     x->engine->connect(x->port->s_name);
 }
-static void open_port(OpenDMX* x, t_symbol* s, long ac, t_atom* av) { defer(x, reinterpret_cast<method>(open_low), s, ac, av); }
+static void open_port(OpenDMX* x, t_symbol* s, long ac, t_atom* av) { defer_low(x, reinterpret_cast<method>(open_low), s, ac, av); }
 static void close_low(OpenDMX* x, t_symbol*, long, t_atom*) { x->engine->connect(""); }
-static void close_port(OpenDMX* x) { defer(x, reinterpret_cast<method>(close_low), nullptr, 0, nullptr); }
+static void close_port(OpenDMX* x) { defer_low(x, reinterpret_cast<method>(close_low), nullptr, 0, nullptr); }
 static void status_low(OpenDMX* x, t_symbol*, long, t_atom*) {
     t_atom a[2]; atom_setlong(a, x->engine->connected()); atom_setsym(a + 1, x->port);
     outlet_anything(x->status, gensym("status"), 2, a);
 }
-static void status(OpenDMX* x) { defer(x, reinterpret_cast<method>(status_low), nullptr, 0, nullptr); }
-static void data_low(OpenDMX* x, t_symbol* s, long ac, t_atom* av) {
+static void status(OpenDMX* x) { defer_low(x, reinterpret_cast<method>(status_low), nullptr, 0, nullptr); }
+static void data(OpenDMX* x, t_symbol* s, long ac, t_atom* av) {
     size_t offset = 0;
     const bool channel = s == gensym("channel") || s == gensym("setchannel");
     if (channel || s == gensym("set_offset")) {
@@ -115,33 +115,39 @@ static void data_low(OpenDMX* x, t_symbol* s, long ac, t_atom* av) {
             object_error(reinterpret_cast<t_object*>(x), "%s requires an integer channel and value(s)", s->s_name); return;
         }
         const auto index = atom_getlong(av);
-        if (index < x->origin || index > x->origin + 511) {
+        const auto origin = x->engine->origin();
+        if (index < origin || index > origin + 511) {
             object_error(reinterpret_cast<t_object*>(x), "channel is outside the 512-slot buffer"); return;
         }
-        offset = static_cast<size_t>(index - x->origin); ++av; --ac;
+        offset = static_cast<size_t>(index - origin); ++av; --ac;
     }
     if (ac <= 0) return;
-    std::vector<uint8_t> values;
+    std::array<uint8_t, 512> values;
     const long count = std::min(ac, static_cast<long>(512 - offset));
-    values.reserve(count);
     for (long i = 0; i < count; ++i) {
         if ((atom_gettype(av + i) != A_LONG && atom_gettype(av + i) != A_FLOAT) || !std::isfinite(atom_getfloat(av + i))) {
             object_error(reinterpret_cast<t_object*>(x), "DMX values must be finite numbers"); return;
         }
-        values.push_back(static_cast<uint8_t>(std::clamp(atom_getfloat(av + i), 0.0, 255.0)));
+        values[i] = static_cast<uint8_t>(std::clamp(atom_getfloat(av + i), 0.0, 255.0));
     }
-    x->engine->update(offset, values, s == gensym("list") || s == gensym("channel"));
+    x->engine->update(offset, values.data(), count, s == gensym("list") || s == gensym("channel"));
 }
-static void data(OpenDMX* x, t_symbol* s, long ac, t_atom* av) { defer(x, reinterpret_cast<method>(data_low), s, ac, av); }
-static void bang_low(OpenDMX* x, t_symbol*, long, t_atom*) { x->engine->bang(); }
-static void bang(OpenDMX* x) { defer(x, reinterpret_cast<method>(bang_low), nullptr, 0, nullptr); }
+static void input_int(OpenDMX* x, t_atom_long value) {
+    t_atom a; atom_setlong(&a, value);
+    data(x, gensym("list"), 1, &a);
+}
+static void input_float(OpenDMX* x, double value) {
+    t_atom a; atom_setfloat(&a, value);
+    data(x, gensym("list"), 1, &a);
+}
+static void bang(OpenDMX* x) { x->engine->bang(); }
 static void dump_low(OpenDMX* x, t_symbol*, long, t_atom*) {
     const auto data = x->engine->dump();
     std::vector<t_atom> atoms(data.size());
     for (size_t i = 0; i < data.size(); ++i) atom_setlong(&atoms[i], data[i]);
     outlet_list(x->output, nullptr, static_cast<short>(atoms.size()), atoms.data());
 }
-static void dump(OpenDMX* x) { defer(x, reinterpret_cast<method>(dump_low), nullptr, 0, nullptr); }
+static void dump(OpenDMX* x) { defer_low(x, reinterpret_cast<method>(dump_low), nullptr, 0, nullptr); }
 static void assist(OpenDMX*, void*, long m, long a, char* text) {
     std::snprintf(text, 512, "%s", m == ASSIST_INLET ? "DMX list / channel / set / bang; port and attributes" :
         (a == 0 ? "Bang after serial frame / dump list" : "ports / opened / closed / error / status"));
@@ -175,6 +181,8 @@ extern "C" void C74_EXPORT ext_main(void*) {
     logger = os_log_create("jp.2bit.bbb.opendmxusb", "serial");
     auto* c = class_new("bbb.opendmxusb", reinterpret_cast<method>(new_object), reinterpret_cast<method>(free_object), sizeof(OpenDMX), nullptr, A_GIMME, 0);
     klass = c;
+    class_addmethod(c, reinterpret_cast<method>(input_int), "int", A_LONG, 0);
+    class_addmethod(c, reinterpret_cast<method>(input_float), "float", A_FLOAT, 0);
     class_addmethod(c, reinterpret_cast<method>(data), "list", A_GIMME, 0);
     for (const auto* name : {"channel", "setchannel", "set", "set_offset"}) class_addmethod(c, reinterpret_cast<method>(data), name, A_GIMME, 0);
     class_addmethod(c, reinterpret_cast<method>(bang), "bang", 0);
