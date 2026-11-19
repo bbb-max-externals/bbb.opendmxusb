@@ -1,71 +1,71 @@
 # bbb.opendmxusb
 
-ENTTEC **OPEN DMX USB**用のMax external。macOS 11以降、Apple Silicon / IntelのUniversal Binary。FTDIの仮想シリアルポート（VCP）を使い、250000 baud / 8N2、BREAK、MAB、start code 0 + DMXデータを専用スレッドから送る。
+A Max external for sending DMX to an **ENTTEC OPEN DMX USB** on macOS 11 or later. The universal binary runs on Apple Silicon and Intel Macs. A dedicated thread drives the FTDI virtual serial port (VCP) at 250,000 baud, 8N2. Each frame starts with a break and a mark after break (MAB), followed by start code 0 and the channel values.
 
-`bbb.artnet.controller` のDMX操作APIを引き継ぎ、ユニバース、IP、Art-Net、OSC設定を除いた。USB PROのパケット形式とRDMには非対応。シリアルポート名から機器の種類を判別する機能はない。
+The external uses the DMX messages from `bbb.artnet.controller` and omits its universe, IP, Art-Net and OSC settings. The USB PRO packet format and RDM are unsupported.
 
-## インストールと開始
+## Installation and first output
 
-1. このパッケージを `~/Documents/Max 9/Packages/bbb.opendmxusb` に置く（開発時はシンボリックリンクでも可）。
-2. externalを更新した場合は、作業を保存してMaxを再起動する。
-3. `[bbb.opendmxusb]` を作成してヘルプを開く。
-4. `[attrui @attr port]` を接続し、ENTTECに対応する `/dev/cu.usbserial-...` を選ぶ。選択すると非同期に接続する。
-5. `channel 1 255` または `255 128 0` などを送る。
+1. Place the package in `~/Documents/Max 9/Packages/bbb.opendmxusb`. For development, a symlink to the package directory also works.
+2. If you updated the external, save your work and restart Max.
+3. Create a `[bbb.opendmxusb]` object and open its help patch.
+4. Connect `[attrui @attr port]` to the object and select the `/dev/cu.usbserial-...` port for your ENTTEC interface. The port opens asynchronously.
+5. Send `channel 1 255` to set the first channel to full, or send a list such as `255 128 0` to set the first three channels.
 
-ポートは起動時に列挙する。USB抜き差し後は `ports` または `refresh` で選択肢を更新する。`port none` は切断、`close` は選択を保持したまま切断、`open` は選択中ポートに再接続する。自動で先頭ポートを開くことはない。保存した `@port` はパッチ再読込時に再接続する。
+The object scans for ports at startup. After plugging in or unplugging a device, send `ports` or `refresh` to update the menu. A new object starts with `port none`. If you save a patch with a selected `@port`, the object reconnects to that port when you reopen the patch. Send `close` to disconnect and keep the selection for a later `open`. Send `port none` to disconnect and clear the selection.
 
-FTDI VCPポートがOSから見えている必要がある。D2XX専用構成のままでは使用できない。`ports` はBluetoothを含むOSのcalloutシリアルポート全体を列挙するため、OPEN DMX USBに対応するものを選ぶ。
+The FTDI interface must appear in macOS as a virtual serial port. A D2XX-only setup cannot provide that port. The menu lists all macOS callout serial ports, including Bluetooth ports. Select the one that belongs to your OPEN DMX USB, since the external cannot identify the device type from the port name.
 
-## メッセージ
+## Messages
 
-| メッセージ | 動作 |
+| Message | Action |
 | --- | --- |
-| `list V...` / 数値リスト | 先頭チャンネルから更新し、modeに応じて送信要求 |
-| `channel CH VALUE` | 1ch更新し、modeに応じて送信要求 |
-| `set V...` | 先頭から格納。送信要求を出さない |
-| `setchannel CH VALUE` | 1ch格納。送信要求を出さない |
-| `set_offset CH V...` | 指定chから格納。送信要求を出さない |
-| `bang` | 現在の値の送信を要求（全mode共通） |
-| `dump` | 格納値を左outletにリスト出力。blackout前の値 |
-| `ports` / `refresh` | 再列挙し、attruiの候補を更新。右outletに `ports PATH...` |
-| `port PATH` / `open PATH` | ポート選択・非同期接続 |
-| `open` | 選択ポートへ再接続 |
-| `close` | 切断。ポート選択とDMXバッファを保持 |
-| `status` | 右outletに `status CONNECTED SELECTED_PORT` |
+| `list V...` or a numeric list | Update values starting at the first channel. The current mode determines whether to request a frame. |
+| `channel CH VALUE` | Update one channel. The current mode determines whether to request a frame. |
+| `set V...` | Store values starting at the first channel without requesting a frame. |
+| `setchannel CH VALUE` | Store one channel value without requesting a frame. |
+| `set_offset CH V...` | Store consecutive values starting at channel `CH` without requesting a frame. |
+| `bang` | Request a frame with the current values in any mode. |
+| `dump` | Send the stored values, before blackout, to the left outlet as a list. |
+| `ports` / `refresh` | Rescan the ports, update the `attrui` menu and send `ports PATH...` to the right outlet. |
+| `port PATH` / `open PATH` | Select a serial port and open it asynchronously. |
+| `open` | Reconnect to the selected port. |
+| `close` | Disconnect and keep the selected port and stored DMX values. |
+| `status` | Send `status CONNECTED SELECTED_PORT` to the right outlet. |
 
-値は0〜255にクリップし、小数は切り捨てる。非数値、NaN、無効な開始chはエラー。バッファは常に512chで、リスト末尾の超過は切り捨て、指定しなかった値は保持する。`num_channels` を減らしても後半の格納値は消えない。
+Channel values are clipped to 0–255 and fractional values are truncated. Nonnumeric values, NaN and invalid starting channels produce an error. The buffer always holds 512 channels. Lists that extend past the end are truncated, and channels outside the updated range keep their values. Reducing `num_channels` also preserves the stored values beyond the new output range.
 
-## 属性
+## Attributes
 
-| 属性 | 既定値 | 意味 |
+| Attribute | Default | Meaning |
 | --- | --- | --- |
-| `port` | `none` | シリアルポート。attruiで選択可能 |
-| `num_channels` | `512` | 送るチャンネル数、1〜512 |
-| `origin` | `1` | channel / setchannel / set_offset の番号起点（0または1） |
-| `blackout` | `0` | 次に作る送信フレームをゼロ化。格納値を保持 |
-| `mode` | `4` | 下表参照 |
-| `framerate` | `40.` | 送信頻度の上限、0.01〜44 fps |
-| `verbose` | `0` | 接続状態をMax Consoleにも表示 |
+| `port` | `none` | Serial port path, selectable with `attrui`. |
+| `num_channels` | `512` | Number of channels to transmit, from 1 to 512. |
+| `origin` | `1` | Channel numbering for `channel`, `setchannel` and `set_offset`. Set to 0 for zero-based numbering or 1 for one-based numbering. |
+| `blackout` | `0` | Set to 1 to send zeros in newly generated frames while preserving stored levels. |
+| `mode` | `4` | Transmission mode, as listed below. |
+| `framerate` | `40.` | Maximum frame rate, from 0.01 to 44 fps. |
+| `verbose` | `0` | Set to 1 to print connection events to the Max Console. |
 
-| mode | 名称 | 動作 |
+| Mode | Name | When it sends |
 | --- | --- | --- |
-| 0 | automatic | list / channelで送信要求 |
-| 1 | bang | bang時のみ送信要求 |
-| 2 | update | list / channelで送信要求（参照APIと同じくautomaticと同動作） |
-| 3 | change | list / channelで前回要求と送信内容が異なる場合だけ要求 |
-| 4 | forced | 更新がなくても連続送信。set系も次の周期に反映 |
+| 0 | automatic | On `list` or `channel`. |
+| 1 | bang | Only on `bang`. |
+| 2 | update | On `list` or `channel`, matching automatic mode in the reference API. |
+| 3 | change | On `list` or `channel` if the outgoing frame differs from the last one requested. |
+| 4 | forced | Continuously, even when values stay the same. Stored updates take effect on the next refresh. |
 
-OPEN DMXにはハードウェア側の自動再送がないため、Art-Net参照実装の既定値0から **forced=4に変更**している。イベント送信のmodeではDMXが途切れ、照明器具のタイムアウト動作になることがある。
+The OPEN DMX USB relies on the host to repeat frames, so this external defaults to **forced mode (4)**. The Art-Net reference implementation defaults to automatic mode (0). In event-driven modes, a gap between messages can cause a fixture to time out.
 
-全modeで送信は非同期。送信能力を超えた要求は最新1フレームにまとめるため、入力メッセージ数とフレーム数は一致しない。set系は既に要求済みのフレームを書き換えない。ポート切替・切断で未送信要求を破棄する。接続エラー後は明示的な `open` で再試行する。
+Transmission is asynchronous in every mode. When requests arrive faster than the port can transmit them, the worker keeps only the latest pending frame. The `set` messages update stored values for future frames. A frame already requested keeps its original values. Switching or closing the port discards pending requests. After a connection error, send `open` to retry.
 
-`framerate` は上限で、USBドライバ、OSスケジューラ、ch数によって実効fpsは下がる。BREAK 200μs / MAB 20μsはホスト側の最小待機値。UARTの取りこぼしを避けるため出力キュー排出後にも1フレーム分+1msの余裕を取る。正確な電気的タイミングは実機計測が必要。
+The actual frame rate depends on the USB driver, OS scheduling and channel count. The host waits at least 200 µs for the break and 20 µs for the MAB. Once the output queue drains, the worker waits one frame time plus 1 ms to allow the UART to finish transmitting. Verify electrical timing with a measurement at the DMX output.
 
-左outletはシリアル送信処理完了後のbangと `dump` のlist。これは灯体による受信確認ではない。右outletは `ports`、`opened PATH`、`closed`、`error DESCRIPTION`、`status`。Maxが長時間ブロックされた場合、通知のcatch-upは256bangまでに制限し、残数を `coalesced N` で通知する。
+The left outlet sends a bang when the serial send routine finishes and a list in response to `dump`. The bang reports host-side completion. Fixture reception requires a separate check. The right outlet reports `ports`, `opened PATH`, `closed`, `error DESCRIPTION` and `status`. If Max stalls long enough for notifications to accumulate, the object emits up to 256 catch-up bangs and reports the remaining count as `coalesced N`.
 
-## ビルド
+## Build
 
-CMake、Xcode Command Line Tools、既存のCycling '74 `max-sdk-base` が必要。SDKやシリアルライブラリを自動ダウンロードしない。
+The build requires CMake, Xcode Command Line Tools and a local checkout of Cycling '74's `max-sdk-base`. It uses the local SDK and system serial APIs without downloading dependencies.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -73,9 +73,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 cmake --build build -j 4
 ```
 
-このワークスペースでは隣の `bbb.utils/deps/min-api/max-sdk-base` を既定で使う。成果物は `externals/bbb.opendmxusb.mxo`。ローカル実行用にad-hoc署名する。
+In this workspace, CMake defaults to the SDK in the neighboring `bbb.utils/deps/min-api/max-sdk-base` directory. The build produces `externals/bbb.opendmxusb.mxo` and applies an ad hoc signature for local use.
 
-## 検証とログ
+## Verification and logs
 
 ```sh
 cmake -S . -B build -DOPEN_DMX_BUILD_TESTS=ON
@@ -83,22 +83,22 @@ cmake --build build -j 4
 ctest --test-dir build --output-on-failure
 ```
 
-テストは実機に送信せず、frame境界、blackoutでの格納値保持、送信mode、refresh変更、切断、再接続、終了処理を確認する。
+The engine tests use a simulated port to check frame boundaries, level retention during blackout, transmission modes, refresh rate changes, disconnection, reconnection and shutdown.
 
-Max上のAPIテストは `tests/max-smoke.maxpat` を開く。実在しないテストポート以外には自動接続しない。事前に `artifacts/` を作成すると結果を `artifacts/max-smoke.json` に保存する。結果の根拠と未検証事項は [docs/verification.md](docs/verification.md) を参照。
+To check the API in Max, create the `artifacts/` directory and open `tests/max-smoke.maxpat`. The patch attempts to open a deliberately nonexistent test port and writes the results to `artifacts/max-smoke.json`. For the recorded results and the remaining hardware checks, see [Verification](docs/verification.md).
 
-接続とエラーはmacOS Unified Logにも記録する（DMX値そのものは記録しない）。
+Connection events and errors are also recorded in the macOS unified log. DMX channel values are excluded.
 
 ```sh
 /usr/bin/log show --last 10m --style compact \
   --predicate 'subsystem == "jp.2bit.bbb.opendmxusb"'
 ```
 
-## 参照
+## References
 
-- [ENTTEC OPEN DMX USB](https://www.enttec.com/product/dmx-usb-interfaces/open-dmx-usb/): 512chのUSB DMXインターフェース、FTDIドライバと開発資料。
-- [ENTTEC datasheet](https://cdn.enttec.com/pdf/assets/70303/70303_OPEN_DMX_USB_DATASHEET.pdf): VCP / USB Serial Deviceとしての列挙。
-- [Apple SerialPortSample](https://developer.apple.com/library/archive/samplecode/SerialPortSample/): termios / IOSSIOSPEEDによるシリアル設定。
-- [Max SDK attributes](https://sdk.cdn.cycling74.com/max-sdk-8.2.0/group__attr.html): 属性登録とアクセス。
-- [attrui](https://docs.cycling74.com/reference/attrui/): オブジェクト属性の編集。
-- API参照元: `/Users/2bit/prog/maxproj/bbb.artnet/source/projects/bbb.artnet.controller/bbb.artnet.controller.cpp`。
+- Interface specifications, FTDI drivers and developer resources for the [ENTTEC OPEN DMX USB](https://www.enttec.com/product/dmx-usb-interfaces/open-dmx-usb/).
+- USB serial device and virtual COM port identification in the [ENTTEC datasheet](https://cdn.enttec.com/pdf/assets/70303/70303_OPEN_DMX_USB_DATASHEET.pdf).
+- Serial port configuration with termios and IOSSIOSPEED in Apple's [SerialPortSample](https://developer.apple.com/library/archive/samplecode/SerialPortSample/).
+- Attribute registration and access in the [Max SDK](https://sdk.cdn.cycling74.com/max-sdk-8.2.0/group__attr.html).
+- Editing object attributes with [attrui](https://docs.cycling74.com/reference/attrui/).
+- Local reference implementation at `/Users/2bit/prog/maxproj/bbb.artnet/source/projects/bbb.artnet.controller/bbb.artnet.controller.cpp`.
