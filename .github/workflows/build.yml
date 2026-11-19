@@ -20,6 +20,6 @@ jobs:
       - name: Build and check architectures
         run: |
           cmake --build build --parallel
-          lipo -verify_arch arm64 x86_64 externals/bbb.opendmxusb.mxo/Contents/MacOS/bbb.opendmxusb
+          lipo externals/bbb.opendmxusb.mxo/Contents/MacOS/bbb.opendmxusb -verify_arch arm64 x86_64
       - name: Test frame and transport behavior
         run: ctest --test-dir build --output-on-failure --no-tests=error
